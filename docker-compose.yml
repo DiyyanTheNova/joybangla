@@ -1,0 +1,40 @@
+# ============================================================
+# Docker Compose — one-command production deploy.
+#
+#   docker compose up -d --build
+#
+# Runtime secrets are read from `.env.production` (copy it from
+# `.env.production.example` and fill it in). `NEXT_PUBLIC_*` values are build
+# args because they are inlined into the JS bundle at `next build` time.
+# ============================================================
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Inlined at build time. Override per-environment as needed.
+        NEXT_PUBLIC_SANITY_PROJECT_ID: ${NEXT_PUBLIC_SANITY_PROJECT_ID:-8e5qmtmg}
+        NEXT_PUBLIC_SANITY_DATASET: ${NEXT_PUBLIC_SANITY_DATASET:-production}
+    image: joybangla:latest
+    container_name: joybangla
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    # Load runtime secrets (Resend, NextAuth, UploadThing, ...) from this file.
+    env_file:
+      - .env.production
+    environment:
+      # Fall back to sensible local defaults if not set in .env.production.
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 25s
+      retries: 3

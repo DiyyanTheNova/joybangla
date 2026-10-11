@@ -1,0 +1,79 @@
+# ============================================================================
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# One-click infra-as-code for deploying this app to Render.com as a Docker
+# web service. Render clones the repo, runs `docker build` (runtime: docker),
+# and routes public traffic to the container.
+#
+# Deploy:
+#   1. Push this file to your repo root (it's already there).
+#   2. In the Render Dashboard → New → Blueprint → pick this repo.
+#      (or:  render blueprint launch  )
+#   3. Fill in the "sync: false" secrets in the dashboard when prompted.
+# ============================================================================
+
+services:
+  - type: web
+    name: joybangla
+    # `runtime: docker` → Render builds THIS repo's Dockerfile on every deploy.
+    # (Use `runtime: image` instead only if you pre-build and push to a registry.)
+    runtime: docker
+
+    # Render's free tier works for previews but cold-starts after ~15 min idle.
+    # Switch to `starter` for an always-on production instance.
+    plan: free
+    region: oregon # oregon | frankfurt | singapore | ohio | virginia
+
+    # Dockerfile lives at the repo root; build context is the whole repo.
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # No dockerCommand needed — the Dockerfile's CMD ["node","server.js"] is used.
+    # The standalone server reads $PORT (Render injects 10000) and binds 0.0.0.0.
+
+    # Health check: Render GETs this path and expects a 2xx/3xx within 5s.
+    # The home route is prerendered static and returns 200 quickly.
+    healthCheckPath: /
+
+    # Auto-deploy on every push to this branch.
+    repo: https://github.com/DiyyanTheNova/joybangla
+    branch: main
+    autoDeploy: true
+
+    envVars:
+      # ---- Public, build-time values --------------------------------------
+      # NEXT_PUBLIC_* are inlined into the JS bundle during `next build`.
+      # Render automatically turns these into Docker build args, and the
+      # Dockerfile declares matching ARGs, so they land in the image correctly.
+      - key: NEXT_PUBLIC_SANITY_PROJECT_ID
+        value: "8e5qmtmg"
+      - key: NEXT_PUBLIC_SANITY_DATASET
+        value: "production"
+
+      # ---- Secrets / per-environment values (set in the Render Dashboard) --
+      # `sync: false` → NOT stored in this file; you enter them in the dashboard
+      # (or as secret files). They are provided to the app at RUN TIME only and
+      # are never baked into the image (the Dockerfile never declares them as ARG).
+
+      # NextAuth: Render auto-generates a strong random secret for you.
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+
+      # NextAuth: MUST equal your service's public URL (no trailing slash),
+      # e.g. https://joybangla.onrender.com — set this AFTER the first deploy
+      # once Render has assigned your *.onrender.com hostname.
+      - key: NEXTAUTH_URL
+        sync: false
+
+      # Resend — transactional email for the contact form (optional).
+      - key: RESEND_API_KEY
+        sync: false
+
+      # UploadThing — file uploads (optional).
+      - key: UPLOADTHING_SECRET
+        sync: false
+      - key: UPLOADTHING_APP_ID
+        sync: false
+
+      # Sanity write token for drafts/preview (optional, keep secret).
+      - key: SANITY_API_TOKEN
+        sync: false
